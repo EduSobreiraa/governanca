@@ -1,19 +1,26 @@
 # Método e resultados da captura de respostas
 
-**Atualizado em:** 7 de outubro de 2026  
+**Atualizado em:** 8 de outubro de 2026
+
 **Escopo:** ensaios exploratórios de captura de respostas do ChatGPT pela rede, incluindo geração e download de arquivos.
 
 ## Resumo
 
 O progresso estava documentado em dois arquivos: um protocolo de validação e um relatório experimental. Este documento reúne o método aplicado e os principais resultados num só lugar.
 
-Até agora, a reconstrução de respostas foi verificada em capturas exploratórias feitas com CDP na mesma aba do navegador. Em um ensaio com CSV e PDF, a resposta textual e a transferência do arquivo apareceram em requisições distintas. O teste exploratório de arquivos foi bem-sucedido; ainda falta repetir os fluxos pela extensão de navegador, que é o mecanismo planejado para coleta em cada máquina.
+Até agora, a reconstrução de respostas foi verificada em capturas exploratórias feitas com CDP na mesma aba do navegador. Em 8 de outubro, uma conversa independente validou prosa, lista, Unicode e bloco de código: o corpo de 11.981 bytes igualou a soma de `dataLength` e a reconstrução normalizada coincidiu com o DOM. Três interrupções também foram capturadas. Em um ensaio anterior com CSV e PDF, a resposta textual e a transferência do arquivo apareceram em requisições distintas. Ainda falta comparar esses resultados com a extensão no ambiente em que ela será ativada.
 
 ## Objetivo e limites
 
 O objetivo é reconstruir a resposta a partir dos eventos e corpos de resposta da rede, comparar o resultado com o que a interface exibiu e identificar metadados de arquivos. A interface serve como referência de comparação depois que a reconstrução é congelada.
 
 Os ensaios descritos aqui usam captura exploratória via CDP. Eles demonstram o que foi possível observar nessa sessão e não comprovam que a extensão de navegador já captura os mesmos dados. A extensão é o caminho previsto para a coleta em cada máquina e precisa de validação própria.
+
+## Sequência de trabalho combinada
+
+1. Terminar os métodos e casos com a captura exploratória. A conversa independente, os formatos Markdown e três interrupções já foram cobertos; a regeneração continua pendente porque a interface não ofereceu essa ação.
+2. Comparar a captura da extensão numa sessão em que ela esteja ativada no ambiente de teste.
+3. Adaptar a extensão ao método de captura que passar pela validação exploratória e comparativa.
 
 ## Método de captura usado
 
@@ -42,11 +49,11 @@ Nos exemplos observados, os frames DPU carregam snapshots de blocos. Processar o
 
 | Ensaio | Situação | Resultado observado | Próximo passo |
 |---|---|---|---|
-| 1. Captura integral | Parcialmente validado | Em três respostas da mesma conversa sem anexos, o corpo recuperado correspondeu à soma de `dataLength`. | Repetir numa conversa independente. |
-| 2. Decodificação e snapshots | Validado nos exemplos executados | Quatro respostas (duas em prosa, uma lista e um bloco de código) foram reconstruídas e comparadas com a interface. Foi observado substituir e acrescentar blocos. | Repetir via extensão. |
-| 3. Formatos de resposta | Validado nos exemplos executados | Prosa, listas numeradas e com marcadores, código, caracteres especiais e Markdown misto corresponderam à interface. Uma lista teve `ERR_NETWORK_CHANGED`, mas a resposta terminou e a interface reconectou. | Repetir via extensão e cobrir variações adicionais. |
-| 4. Identidade e regeneração | Parcial | Foram observados `Network.requestId`, `operationId` e `conversationId`. A semântica do `data-message-id` e o vínculo entre regenerações ainda não foram confirmados. | Investigar IDs em respostas e regenerações controladas. |
-| 5. Interrupção e eventos auxiliares | Parcial | `ERR_ABORTED` apareceu após respostas completas e em ações de parar. Um ensaio longo interrompido mostrou resposta parcial na interface, mas não teve captura de rede correspondente. | Repetir com a extensão, cobrindo conclusão normal e pelo menos três interrupções. |
+| 1. Captura integral | Validado exploratoriamente em conversa independente | Além das três respostas anteriores, uma resposta nova teve corpo de 11.981 bytes igual à soma de `dataLength`. A primeira tentativa falhou com `ERR_NETWORK_CHANGED`; o reenvio capturou o stream completo. | Repetir na extensão quando ela estiver disponível. |
+| 2. Decodificação e snapshots | Validado nos exemplos executados | A resposta de teste foi reconstruída das operações DPU e coincidiu com o DOM após remover marcadores Markdown e normalizar espaços. | Repetir via extensão. |
+| 3. Formatos de resposta | Validado nos exemplos executados | Prosa, listas, código, caracteres especiais, Markdown misto e Unicode (`βeta`) corresponderam ao conteúdo renderizado. | Repetir via extensão e cobrir variações adicionais. |
+| 4. Identidade e regeneração | Parcial | Em três mensagens do assistente na conversa, os `data-message-id` do DOM eram únicos; o `message.id` do segundo turno capturado no stream correspondeu ao DOM. `conversation_id` do stream correspondeu à rota; o ID de requisição CDP diferiu do `metadata.request_id` do backend. Em 8/10, inspecionei o menu de uma resposta interrompida e de uma resposta concluída (resposta sintética `OK`); nenhuma ofereceu regeneração. | Correlacionar mais turnos e repetir regeneração quando houver controle disponível. |
+| 5. Interrupção e eventos auxiliares | Três interrupções exploratórias via CDP | Em 3/3 o endpoint `POST /backend-api/stop_conversation` retornou 200 e a UI ficou parcial. Dois streams terminaram com `ERR_ABORTED` (`canceled=true`); um terminou com `loadingFinished`, embora o DPU ainda marcasse `in_progress` e `end_turn=null`. | Repetir via extensão e comparar também com geração normal. |
 | 6. Geração e transferência de arquivos | Executado exploratoriamente via CDP | CSV e PDF foram gerados e baixados. A resposta de conversa, os metadados do download e a transferência do conteúdo apareceram em requisições separadas. | Repetir os mesmos casos pela extensão. |
 
 ## Ensaio 6: CSV e PDF
@@ -77,13 +84,35 @@ Os arquivos continham dados sintéticos. Os valores abaixo descrevem a captura l
 
 Nos dois casos, a resposta em streaming mencionou o nome, mas não continha os bytes do arquivo. O conteúdo veio por uma requisição separada para `/backend-api/estuary/content`. A resposta JSON de metadados apresentou nome e MIME do PDF, mas não tamanho; para o CSV, nome, MIME e tamanho vieram nulos. Portanto, foi possível obter os metadados do PDF pela resposta JSON e do CSV pelos cabeçalhos da transferência, e verificar tamanho e hash nos arquivos baixados localmente.
 
+## Ensaios adicionais em conversa independente e interrupções — 8 de outubro de 2026
+
+### Formatos e reconstrução
+
+Foi enviada uma resposta sintética com título, lista numerada contendo `alpha`, `βeta` e `linha 3`, e um bloco de código `txt` com `A&B <C>`. O primeiro envio terminou em `net::ERR_NETWORK_CHANGED` e a interface mostrou erro. Após reenviar o mesmo prompt numa conversa independente, o stream `POST /backend-api/f/conversation` retornou status 200 e `text/event-stream`.
+
+O corpo recuperado teve 11.981 bytes, exatamente a soma de `dataLength` em 11 eventos `Network.dataReceived`. Após excluir do processamento o frame de token de retomada, foram decodificados 21 frames JSON. As operações DPU de texto reconstruíram o título, os três itens e o código. Removendo da reconstrução apenas a sintaxe Markdown e normalizando espaços, o resultado coincidiu com o texto dos nós de resposta no DOM. A comparação é normalizada porque o DOM renderiza a lista sem os numerais e remove as cercas do bloco de código.
+
+### Identificadores
+
+Na mesma conversa, um segundo turno sintético confirmou que `message.id` no snapshot de rede correspondeu ao `data-message-id` do respectivo nó do assistente no DOM. O `conversation_id` do stream correspondeu à rota da conversa. O `Network.requestId` do CDP era distinto do `metadata.request_id` presente na mensagem. Os três nós de resposta observados no DOM tinham IDs distintos. A opção de regenerar não apareceu nos controles disponíveis nessa conversa; a semântica de IDs em regenerações continua em aberto.
+
+Em 8 de outubro, enviei também um turno curto sintético (`Teste de regeneração: responda apenas com a palavra OK.`), que terminou com `OK`. O menu de ações da resposta concluída ofereceu visualizar fontes, derivar chat e leitura em voz alta, sem opção de regenerar. Portanto, o caso de regeneração não pôde ser exercitado pela UI; não inferir seu comportamento a partir desse teste.
+
+### Interrupções controladas
+
+Foram iniciadas três respostas sintéticas longas e acionado `Parar` quando já havia texto parcial visível. Em todas as três, o endpoint auxiliar `POST /backend-api/stop_conversation` retornou status 200, o botão de parada desapareceu e a interface preservou uma resposta parcial.
+
+- Interrupções 1 e 3: o stream terminou com `Network.loadingFailed`, `net::ERR_ABORTED` e `canceled=true`.
+- Interrupção 2: o stream terminou com `Network.loadingFinished`, sem erro de transporte; ainda assim, o snapshot final permaneceu com status `in_progress` e `end_turn=null`, e a resposta visível estava incompleta.
+
+Esse terceiro resultado confirma que `loadingFinished` sozinho não basta para classificar uma resposta como completa. É necessário considerar o estado DPU, a chamada de interrupção e a interface.
+
 ## Próximos passos
 
-1. Repetir o ensaio CSV/PDF instrumentando a extensão e verificar se ela observa a resposta de conversa, o JSON de metadados e a transferência do conteúdo.
-2. Validar o cálculo de tamanho e hash local pela extensão sem registrar URL assinada ou credenciais.
-3. Repetir a captura integral e a reconstrução em conversa independente.
-4. Concluir a semântica dos IDs e a associação de mensagens regeneradas.
-5. Repetir o ensaio de interrupção com a extensão, incluindo conclusão normal e pelo menos três ações de parar.
+1. Comparar pela extensão a geração normal, os três fluxos interrompidos e a captura integral.
+2. Repetir via extensão os casos CSV/PDF e verificar stream da conversa, JSON de metadados e transferência do conteúdo.
+3. Validar tamanho e hash local pela extensão sem registrar URLs assinadas ou credenciais.
+4. Concluir a semântica dos IDs em vários turnos e em regenerações quando a interface oferecer a ação.
 
 ## Documentos de referência
 

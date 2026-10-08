@@ -1,6 +1,6 @@
 # Relatório experimental: reconstrução de respostas pelo stream
 
-Datas das sessões: 2026-10-06 e 2026-10-07 (Bahia). Horários anteriores abaixo em UTC; para Bahia (UTC−3), subtrair 3 horas. Valores só são preenchidos quando foram observados nas capturas disponíveis. `n/d` significa que o campo não foi registrado; não deve ser inferido de outro teste.
+Datas das sessões: 2026-10-06 a 2026-10-08 (Bahia). Horários anteriores abaixo em UTC; para Bahia (UTC−3), subtrair 3 horas. Valores só são preenchidos quando foram observados nas capturas disponíveis. `n/d` significa que o campo não foi registrado; não deve ser inferido de outro teste.
 
 ## Objetivo atual: reconstruir a resposta a partir do stream
 
@@ -17,15 +17,15 @@ A investigação agora prioriza saber se o corpo de /conversation/updates pode s
 - O stream terminou em loadingFailed / ERR_ABORTED depois da resposta completa. Esse erro, sozinho, não identifica Stop.
 - No Teste 2, quatro corpos foram decodificados e reconstruídos: duas respostas em prosa, uma lista numerada e um bloco de código com explicação. Todos coincidiram com o estado final visível; detalhes abaixo.
 - No Teste 3, duas respostas por formato foram validadas para prosa, lista numerada, lista com marcadores, código, caracteres especiais e Markdown misto. Todos os corpos bateram com a soma de `dataLength`; a estrutura final também coincidiu com a UI.
-- Ainda não estão validados a generalização para outras rotas/versões, o papel semântico do campo `data-message-id` nem o comportamento de regeneração.
+- A associação de `message.id` com `data-message-id` foi confirmada em um turno sintético da conversa autenticada; ainda falta validar a generalização para outras rotas/versões e o comportamento de regeneração.
 
 ### Identidades: escopos observados
 
-Network.requestId é o identificador de transporte do Chrome. data-request-id e operationId são campos do aplicativo observados no payload; conversationId identifica a conversa segundo o campo reportado. O valor de data-message-id foi registrado, mas seu referente não foi confirmado. Não o trate como ID da resposta do assistente até validar a relação em mais execuções.
+`Network.requestId` é o identificador de transporte do Chrome. `data-request-id` e `operationId` são campos do aplicativo observados no payload. Numa captura recente, `message.id` do stream correspondeu ao `data-message-id` do nó do assistente; o `conversation_id` correspondeu à rota e o `Network.requestId` diferiu do `metadata.request_id` da mensagem. Essa associação foi observada em um turno e ainda não deve ser generalizada para outras rotas, regenerações ou versões.
 
 ### Limites da amostra atual
 
-A evidência direta vem de poucas execuções na rota anônima unauth-mweb. A reconstrução foi comparada à interface depois da resposta completa, portanto a captura mais recente não mede o instante em que cada parte apareceu na UI. Quadros, campos e semânticas podem variar entre rotas e versões.
+A evidência direta inclui execuções na rota anônima `unauth-mweb` e, em 2026-10-08, na aba autenticada do ChatGPT via CDP da mesma aba. A reconstrução foi comparada à interface depois da resposta completa nos casos de reconstrução. Quadros, campos e semânticas podem variar entre rotas e versões.
 
 ## Captura direta mais recente
 
@@ -356,12 +356,11 @@ Prompt: “Descreva a formação de uma nuvem desde a evaporação até a chuva.
 
 ## Próximos ensaios prioritários
 
-1. Correlacionar os IDs em vários turnos e numa regeneração quando disponível; determinar a que entidade pertence `data-message-id`.
-2. Repetir o Teste 5 com captura pela extensão: comparar finalização normal com pelo menos três Stops e registrar a ação, UI, eventos de rede e requests auxiliares.
+1. Confirmar a associação de IDs em mais turnos e numa regeneração quando a interface oferecer essa ação.
+2. Repetir o Teste 5 pela extensão, comparando uma conclusão normal com as três interrupções já observadas via CDP.
 3. Repetir o Teste 6 pela extensão; o CDP cobriu CSV e PDF na mesma aba, com transferências e metadados conferidos.
-4. Repetir a captura integral em uma conversa independente e validar os bytes do corpo contra os eventos de transporte.
-5. Repetir o protocolo em outra rota/versão se estiver disponível; registrar divergências de estrutura sem generalizar do frontend atual.
-6. Manter a correlação DOM/rede como observação auxiliar apenas se ela ajudar a validar a resposta reconstruída.
+4. Repetir o protocolo em outra rota/versão se estiver disponível; registrar divergências sem generalizar do frontend atual.
+5. Manter a correlação DOM/rede como observação auxiliar para validar respostas reconstruídas.
 
 ### Tentativas exploratórias de 2026-10-07 sem captura de rede
 
@@ -379,5 +378,15 @@ Para o PDF, também foi capturado `POST /backend-api/f/conversation` (status 200
 Nos dois tipos, o stream da conversa contém o nome do arquivo, mas não os bytes do artefato nem campos explícitos de arquivo; o conteúdo foi entregue por um request separado a `/backend-api/estuary/content`. A resposta JSON de download forneceu nome e MIME para o PDF, mas veio com esses campos nulos para o CSV. Em ambos, o tamanho foi conferido no arquivo baixado, pois não veio preenchido no JSON nem em `Content-Length`. O Teste 6 está concluído para a captura exploratória via CDP nesta sessão; falta validar o fluxo pela extensão do navegador.
 
 Essas tentativas não alteram os critérios de conclusão: repetir os ensaios pela extensão do navegador e capturar os dados de rede na mesma sessão da interface.
+
+### Ensaios via CDP na aba autenticada — 2026-10-08
+
+A configuração do navegador do Codex tornou a capacidade CDP acessível diretamente na mesma aba autenticada do ChatGPT. O cursor dos eventos foi marcado antes de cada ação; nenhuma sessão DevTools separada foi usada para atribuir os eventos.
+
+**Conversa independente, formatos e reconstrução:** foi enviado um prompt sintético pedindo título, lista numerada com três itens, Unicode e bloco de código. A primeira tentativa falhou com `net::ERR_NETWORK_CHANGED`; após novo envio, `POST /backend-api/f/conversation` retornou status 200 e `text/event-stream`. O corpo teve 11.981 bytes, exatamente a soma de `dataLength` em 11 eventos `Network.dataReceived`. Foram decodificados 21 frames JSON sem conservar o frame de token de retomada. As operações DPU reconstruíram o título, os itens e o código; após normalizar a sintaxe Markdown e os espaços, o texto coincidiu com os nós renderizados no DOM.
+
+**Identidade dos IDs:** num segundo turno sintético da conversa, `message.id` no stream correspondeu ao `data-message-id` do nó do assistente. O `conversation_id` do stream correspondeu à rota; `Network.requestId` do CDP foi distinto de `metadata.request_id` da mensagem. Os três nós de resposta observados no DOM tinham IDs únicos. Em 8 de outubro, a inspeção do menu de uma resposta interrompida e de uma resposta curta concluída (`OK`) também não encontrou ação de regeneração; essa semântica permanece sem confirmação.
+
+**Interrupção (três tentativas):** em cada tentativa, foi enviada uma solicitação sintética longa e clicado `Parar` quando já havia texto parcial visível. Nas três, `POST /backend-api/stop_conversation` retornou 200, o botão de parada desapareceu e a resposta exibida ficou parcial. Nas tentativas 1 e 3, o stream terminou com `Network.loadingFailed`, `net::ERR_ABORTED` e `canceled=true`. Na tentativa 2, o stream terminou com `Network.loadingFinished`, mas o snapshot DPU ainda indicava status `in_progress` e `end_turn=null`. Logo, encerramento de transporte normal não equivale necessariamente a resposta concluída; a classificação precisa combinar o evento Stop, o estado final DPU e a UI.
 
 Para detalhes do procedimento e critérios de avanço, consulte [protocolo-validacao-stream-llm.md](protocolo-validacao-stream-llm.md).
