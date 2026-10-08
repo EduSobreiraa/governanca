@@ -1,0 +1,14 @@
+{
+  "manifest_version": 3,
+  "name": "POC de captura de stream local",
+  "version": "0.1.11",
+  "description": "Captura observacional da resposta do ChatGPT e gravação local em SQLite.",
+  "permissions": ["storage"],
+  "host_permissions": ["https://chatgpt.com/*", "http://127.0.0.1:8766/*"],
+  "background": {"service_worker": "src/background/service-worker.js", "type": "module"},
+  "action": {"default_popup": "src/popup/popup.html"},
+  "content_scripts": [
+    {"matches": ["https://chatgpt.com/*"], "js": ["src/content/network-probe-main.js"], "run_at": "document_start", "world": "MAIN"},
+    {"matches": ["https://chatgpt.com/*"], "js": ["src/content/network-bridge.js"], "run_at": "document_start", "world": "ISOLATED"}
+  ]
+}

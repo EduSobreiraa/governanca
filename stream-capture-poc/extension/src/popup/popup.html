@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="pt-BR">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>Captura local</title><link rel="stylesheet" href="popup.css"></head>
+<body>
+  <h1>POC de stream</h1>
+  <p>Captura somente a resposta reconstruída e metadados técnicos. Use conteúdo sintético.</p>
+  <form id="config">
+    <label>Token local do laboratório<input id="token" type="password" autocomplete="off" minlength="24"></label>
+    <label class="check"><input id="enabled" type="checkbox"> Ativar captura</label>
+    <button>Salvar e ativar</button>
+  </form>
+  <button id="health" type="button">Testar API local</button>
+  <p id="status" role="status"></p>
+  <h2>Sonda na aba atual</h2><p id="probe-status">Verificando…</p>
+  <h2>Capturas recentes</h2>
+  <pre id="captures">Nenhuma captura ainda.</pre>
+  <h2>Diagnóstico local</h2><pre id="diagnostics">Sem eventos.</pre>
+  <script src="popup.js"></script>
+</body>
+</html>

@@ -1,0 +1,9 @@
+body { font: 13px system-ui, sans-serif; margin: 16px; width: 340px; color: #18212b; }
+h1 { font-size: 18px; margin: 0 0 8px; }
+p { line-height: 1.45; }
+label { display: grid; gap: 5px; margin: 12px 0; }
+input[type=password] { width: 100%; box-sizing: border-box; padding: 8px; }
+.check { display: flex; align-items: center; }
+button { padding: 7px 10px; margin: 4px 5px 4px 0; }
+#status { min-height: 18px; }
+pre { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 230px; overflow: auto; background: #f2f4f7; padding: 8px; }
